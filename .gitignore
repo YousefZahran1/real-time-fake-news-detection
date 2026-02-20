@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+env/
+.env
+*.pt
+*.pth
+*.ckpt
+checkpoint-4040/
+model/distilbert_model/
+*.safetensors
+*.bin
+*.pt

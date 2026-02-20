@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI News Detector</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="background"></div>
+    <main class="page">
+        <section class="card">
+            <header class="card__header">
+                <p class="eyebrow">Powered by Advanced Machine Learning</p>
+                <h1>AI News Detector</h1>
+                <p class="subtitle">Detect fake news using a fine-tuned DistilBERT model. Analyze text directly or fetch an article by URL.</p>
+            </header>
+
+            {% if error %}
+                <div class="alert alert--error">{{ error }}</div>
+            {% endif %}
+            {% if result and result.error %}
+                <div class="alert alert--error">{{ result.error }}</div>
+            {% endif %}
+
+            <form method="POST" class="analyzer">
+                <input type="hidden" name="mode" id="mode-input" value="{{ mode or 'text' }}">
+                <div class="toggle">
+                    <button type="button" class="toggle__button {% if mode == 'text' %}is-active{% endif %}" data-mode="text">Text</button>
+                    <button type="button" class="toggle__button {% if mode == 'url' %}is-active{% endif %}" data-mode="url">URL</button>
+                </div>
+
+                <div class="input-area">
+                    <textarea id="text-input" name="article_text" placeholder="Paste the news article content here..." class="{% if mode != 'text' %}is-hidden{% endif %}">{{ input_value.text if input_value else '' }}</textarea>
+                    <input id="url-input" name="article_url" type="url" placeholder="https://example.com/news-article" value="{{ input_value.url if input_value else '' }}" class="{% if mode != 'url' %}is-hidden{% endif %}">
+                </div>
+
+                <button type="submit" class="primary-button">Analyze Content</button>
+            </form>
+
+            {% if result and not result.error %}
+                <div class="results">
+                    <div class="result-label {{ 'is-fake' if result.label|upper == 'FAKE' else 'is-real' }}">
+                        <span class="label-text">{{ result.label|upper }}</span>
+                        <span class="label-score">{{ (result.confidence * 100) | round(2) }}% confidence</span>
+                    </div>
+                    <div class="confidence-bar">
+                        <div class="confidence-bar__fill" style="width: {{ (result.confidence * 100) | round(0) }}%;"></div>
+                    </div>
+                    <p class="result-caption">Analysis complete. The model predicts the content is likely <strong>{{ result.label|upper }}</strong>.</p>
+                </div>
+            {% endif %}
+        </section>
+
+        <section class="card live-monitor">
+            <header class="card__header">
+                <p class="eyebrow">Auto-refreshing feed</p>
+                <h2>Live News Monitoring</h2>
+                <p class="subtitle">Latest headlines are pulled every 30 seconds and analyzed instantly by the model.</p>
+            </header>
+            <div class="live-monitor__body">
+                <div class="live-monitor__status" id="live-status">Waiting for next update...</div>
+                <div class="live-monitor__item" id="live-item" aria-live="polite">
+                    <h3 class="live-monitor__headline" id="live-headline">--</h3>
+                    <p class="live-monitor__description" id="live-description">No live headline yet.</p>
+                    <div class="live-monitor__meta">
+                        <span class="live-monitor__badge is-neutral" id="live-label">PENDING</span>
+                        <span class="live-monitor__confidence" id="live-confidence"></span>
+                        <span class="live-monitor__timestamp" id="live-timestamp">Last update: --</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="features">
+            <article class="feature-card">
+                <h3>Advanced AI</h3>
+                <p>Powered by a fine-tuned DistilBERT transformer for nuanced fake news detection.</p>
+            </article>
+            <article class="feature-card">
+                <h3>Real-time Analysis</h3>
+                <p>Fast, near-instant inference so you can validate articles without delay.</p>
+            </article>
+            <article class="feature-card">
+                <h3>Detailed Insights</h3>
+                <p>Clear labeling with confidence scoring for transparent decisions.</p>
+            </article>
+        </section>
+    </main>
+
+    <script>
+        const modeInput = document.getElementById('mode-input');
+        const textInput = document.getElementById('text-input');
+        const urlInput = document.getElementById('url-input');
+        const toggleButtons = document.querySelectorAll('.toggle__button');
+        const liveStatus = document.getElementById('live-status');
+        const liveHeadline = document.getElementById('live-headline');
+        const liveDescription = document.getElementById('live-description');
+        const liveLabel = document.getElementById('live-label');
+        const liveConfidence = document.getElementById('live-confidence');
+        const liveTimestamp = document.getElementById('live-timestamp');
+
+        function updateMode(nextMode) {
+            modeInput.value = nextMode;
+            if (nextMode === 'text') {
+                textInput.classList.remove('is-hidden');
+                urlInput.classList.add('is-hidden');
+            } else {
+                urlInput.classList.remove('is-hidden');
+                textInput.classList.add('is-hidden');
+            }
+            toggleButtons.forEach(btn => {
+                btn.classList.toggle('is-active', btn.dataset.mode === nextMode);
+            });
+        }
+
+        toggleButtons.forEach(button => {
+            button.addEventListener('click', () => updateMode(button.dataset.mode));
+        });
+
+        function renderWaiting(message) {
+            liveStatus.textContent = message || 'Waiting for next update...';
+            liveLabel.textContent = 'PENDING';
+            liveLabel.classList.remove('is-real', 'is-fake');
+            liveLabel.classList.add('is-neutral');
+            liveConfidence.textContent = '';
+        }
+
+        function renderLiveNews(data) {
+            const label = (data.label || '').toUpperCase();
+            liveHeadline.textContent = data.headline || '--';
+            liveDescription.textContent = data.description || 'No description available.';
+            liveLabel.textContent = label || 'UNKNOWN';
+            liveLabel.classList.remove('is-real', 'is-fake', 'is-neutral');
+            if (label === 'REAL') {
+                liveLabel.classList.add('is-real');
+            } else if (label === 'FAKE') {
+                liveLabel.classList.add('is-fake');
+            } else {
+                liveLabel.classList.add('is-neutral');
+            }
+            if (typeof data.confidence === 'number') {
+                liveConfidence.textContent = `${Math.round(data.confidence * 100)}% confidence`;
+            } else {
+                liveConfidence.textContent = '';
+            }
+            const timestamp = data.updated_at ? new Date(data.updated_at) : new Date();
+            liveTimestamp.textContent = `Last update: ${timestamp.toLocaleString()}`;
+            liveStatus.textContent = 'Live feed updated';
+        }
+
+        async function fetchLiveNews() {
+            try {
+                const response = await fetch('/api/live-news', { cache: 'no-store' });
+                const data = await response.json();
+                if (!response.ok || data.status !== 'ok') {
+                    renderWaiting(data.message || 'Waiting for next update...');
+                    return;
+                }
+                renderLiveNews(data);
+            } catch (error) {
+                renderWaiting('Waiting for next update...');
+            }
+        }
+
+        fetchLiveNews();
+        setInterval(fetchLiveNews, 30000);
+    </script>
+</body>
+</html>
